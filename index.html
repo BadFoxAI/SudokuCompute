@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Sudoku Batch Solver (safe mode)</title>
+<title>Sudoku Batch Solver</title>
 <style>
   body {
     background-color: black;
@@ -169,7 +169,7 @@ function cloneGrid(grid) {
   return grid.map(row => row.slice());
 }
 
-// The solver function (unchanged from your working version)
+// The solver function
 async function solveSudokuAsync(grid, maxSolutions = 2) {
   const solutions = [];
   const EMPTY = 0;
