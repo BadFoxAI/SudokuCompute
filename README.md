@@ -19,8 +19,8 @@ A high-performance Sudoku batch solver with async solving, multiple solution det
 - Solves challenging benchmark puzzles 
 - Self-contained, all code in one HTML files. 
 - Finds multiple solutions (up to 2 by default)  
-- Measures and displays time taken to solve each puzzle  
-- Checks for validity of each solution (rows, columns, 3x3 boxes)  
+- Measures and displays time to solve each puzzle  
+- Validity Check for each solution (rows, columns, 3x3 boxes)  
 
 ---
 
