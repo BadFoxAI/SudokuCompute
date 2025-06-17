@@ -1,0 +1,179 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<title>Extreme Hard Subset Sum Solver</title>
+<style>
+  body { font-family: monospace; background: #111; color: #eee; padding: 20px; }
+  textarea { width: 100%; height: 260px; background: #222; color: #eee; border: none; padding: 10px; font-family: monospace; font-size: 14px; }
+  button { padding: 12px 24px; font-size: 18px; margin-top: 10px; cursor: pointer; background: #007acc; border: none; color: #fff; }
+  pre { background: #222; padding: 10px; white-space: pre-wrap; max-height: 480px; overflow-y: auto; margin-top: 15px; }
+</style>
+</head>
+<body>
+
+<h2>Extreme Hard Subset Sum Solver</h2>
+<p>Input puzzles as:</p>
+<pre>
+Numbers: [comma separated numbers]
+Target: number
+</pre>
+<p>Multiple puzzles separated by empty lines. Click <b>Run Solver</b> to start.</p>
+
+<textarea id="inputPuzzles">
+// P1: Pisinger Benchmark
+Numbers: [212, 415, 107, 56, 814, 324, 23, 112, 677, 391, 59, 181, 245, 900, 67, 109, 432, 58, 76, 114]
+Target: 1587
+
+// P2: Martello & Toth Benchmark #5
+Numbers: [504, 529, 577, 678, 720, 830, 895, 913, 974, 1034, 1090, 1170, 1211, 1294, 1348, 1432, 1477, 1539, 1605, 1692]
+Target: 6842
+
+// P3: Merkle-Hellman Challenge (classic)
+Numbers: [2, 3, 7, 14, 30, 57, 120, 251, 501, 1002, 2004, 4009, 8018, 16037, 32075, 64150]
+Target: 64130
+
+// P4: 3-Partition Hard Instance
+Numbers: [30, 40, 45, 50, 55, 60, 65, 70, 75, 80, 85, 90]
+Target: 215
+
+// P5: Custom Large Hard Instance
+Numbers: [2034, 3012, 4501, 5099, 6122, 7000, 8090, 9123, 10045, 11230, 12345, 13400, 14567, 15678, 16789, 17900, 18901, 19999, 21011, 22122, 23000, 24110, 25222, 26333, 27444, 28555]
+Target: 81932
+
+// P6: Balanced Large Set
+Numbers: [200, 400, 600, 800, 1000, 1200, 1400, 1600, 1800, 2000, 2200, 2400, 2600, 2800, 3000, 3200, 3400, 3600, 3800, 4000, 4200, 4400, 4600, 4800]
+Target: 14000
+
+// P7: Hard 50-element Dense Random Set
+Numbers: [523, 837, 1021, 1350, 1642, 2019, 2153, 2417, 2684, 3015, 3222, 3470, 3695, 4012, 4290, 4531, 4780, 4999, 5255, 5490, 5753, 6020, 6301, 6584, 6842, 7093, 7337, 7590, 7833, 8102, 8387, 8601, 8820, 9085, 9333, 9575, 9814, 10023, 10200, 10458, 10722, 10998, 11234, 11455, 11701, 11985, 12200, 12450, 12677, 12902]
+Target: 37000
+
+// P8: Custom Extreme Crafted Set (bitmask style)
+Numbers: [131071, 65536, 32768, 16384, 8192, 4096, 2048, 1024, 512, 256, 128, 64, 32, 16, 8, 4, 2, 1, 3, 7, 15, 31, 63, 127, 255]
+Target: 262143
+
+// P9: Cryptanalysis Hard Challenge (dummy big primes example)
+Numbers: [101, 257, 509, 1021, 2053, 4099, 8209, 16411, 32771, 65537, 131101, 262147, 524309, 1048583]
+Target: 200000
+
+// P10: Very Large Dense Random
+Numbers: [157, 316, 631, 1267, 2521, 5039, 10193, 20411, 40823, 81649, 163303, 326611, 653191, 1306381]
+Target: 580000
+</textarea>
+
+<button id="runSolverBtn">Run Solver</button>
+
+<pre id="output"></pre>
+
+<script>
+(function(){
+  const output = document.getElementById('output');
+  const input = document.getElementById('inputPuzzles');
+  const runBtn = document.getElementById('runSolverBtn');
+
+  function parsePuzzles(text) {
+    // Splits puzzles by blank lines or comments, parses numbers and target
+    let puzzles = [];
+    let current = null;
+    const lines = text.split('\n').map(l => l.trim());
+
+    for(let line of lines) {
+      if(!line || line.startsWith('//')) continue;
+      if(line.startsWith('Numbers:')) {
+        if(current) puzzles.push(current);
+        current = { numbers: null, target: null };
+        try {
+          current.numbers = JSON.parse(line.substring(8).trim());
+        } catch {
+          throw new Error("Invalid Numbers format");
+        }
+      } else if(line.startsWith('Target:')) {
+        if(!current) throw new Error("Target without Numbers");
+        current.target = Number(line.substring(7).trim());
+      }
+    }
+    if(current) puzzles.push(current);
+    return puzzles;
+  }
+
+  function subsetSum(numbers, target, maxSolutions=5) {
+    // Sort descending to optimize pruning
+    numbers = numbers.slice().sort((a,b) => b - a);
+    let n = numbers.length;
+    let solutions = [];
+    let memo = new Map();
+
+    function dfs(idx, sum, chosen) {
+      if(solutions.length >= maxSolutions) return;
+      if(sum === target) {
+        solutions.push(chosen.slice());
+        return;
+      }
+      if(sum > target || idx === n) return;
+
+      let key = idx + ',' + sum;
+      if(memo.has(key)) return; // pruning repeated state
+      memo.set(key, true);
+
+      // Choose current
+      dfs(idx + 1, sum + numbers[idx], [...chosen, numbers[idx]]);
+      // Skip current
+      dfs(idx + 1, sum, chosen);
+    }
+
+    dfs(0, 0, []);
+    return solutions;
+  }
+
+  function verifySolution(solution, target) {
+    return solution.reduce((a,b) => a + b, 0) === target;
+  }
+
+  function formatSolution(sol) {
+    return '[' + sol.join(', ') + ']';
+  }
+
+  runBtn.addEventListener('click', () => {
+    output.textContent = "Parsing puzzles...\n";
+    let puzzles;
+    try {
+      puzzles = parsePuzzles(input.value);
+    } catch(e) {
+      output.textContent += 'Error parsing puzzles: ' + e.message;
+      return;
+    }
+    output.textContent += `Found ${puzzles.length} puzzle(s).\n\n`;
+
+    (async () => {
+      for(let i=0; i<puzzles.length; i++) {
+        const p = puzzles[i];
+        output.textContent += `=== Puzzle #${i+1} ===\n`;
+        output.textContent += `Numbers: [${p.numbers.join(', ')}]\n`;
+        output.textContent += `Target: ${p.target}\n`;
+
+        const start = performance.now();
+        // To avoid freezing UI, let event loop breathe every puzzle
+        await new Promise(r => setTimeout(r, 10));
+        const sols = subsetSum(p.numbers, p.target, 5);
+        const duration = (performance.now() - start).toFixed(2);
+
+        if(sols.length === 0) {
+          output.textContent += `No solutions found in ${duration} ms.\n\n`;
+        } else {
+          output.textContent += `${sols.length} solution(s) found in ${duration} ms:\n`;
+          sols.forEach((sol, idx) => {
+            const valid = verifySolution(sol, p.target) ? 'VALID' : 'INVALID';
+            output.textContent += `Solution #${idx+1}: ${formatSolution(sol)}\nVerification: ${valid}\n`;
+          });
+          output.textContent += '\n';
+        }
+      }
+    })();
+
+  });
+})();
+</script>
+
+</body>
+</html>
