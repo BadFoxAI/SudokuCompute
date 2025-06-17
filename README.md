@@ -1,6 +1,6 @@
 # Sudoku Batch Solver
 
-A high-performance Sudoku batch solver with async solving, multiple solution detection, and solution verification — all rendered in a cool black & green terminal style in the browser.
+A high-performance Sudoku batch solver with async solving, multiple solution detection, and solution verification.
 
 ---
 
