@@ -1,0 +1,158 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <title>Sudoku Solver Terminal</title>
+  <style>
+    body {
+      background-color: #111;
+      color: #0f0;
+      font-family: monospace;
+      padding: 20px;
+    }
+    pre {
+      white-space: pre-wrap;
+    }
+  </style>
+</head>
+<body>
+<pre id="terminal"></pre>
+
+<script>
+const terminal = document.getElementById("terminal");
+
+function print(line = "") {
+  terminal.textContent += line + "\n";
+}
+
+function sleep(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+// Sudoku solving logic
+function isValid(board, row, col, num) {
+  for (let i = 0; i < 9; i++) {
+    if (board[row][i] === num || board[i][col] === num)
+      return false;
+    const boxRow = 3 * Math.floor(row / 3) + Math.floor(i / 3);
+    const boxCol = 3 * Math.floor(col / 3) + i % 3;
+    if (board[boxRow][boxCol] === num)
+      return false;
+  }
+  return true;
+}
+
+function deepCopy(grid) {
+  return grid.map(row => row.slice());
+}
+
+function solveSudoku(board, solutions, limit, attempts) {
+  function solve() {
+    for (let row = 0; row < 9; row++) {
+      for (let col = 0; col < 9; col++) {
+        if (board[row][col] === 0) {
+          for (let num = 1; num <= 9; num++) {
+            attempts.count++;
+            if (isValid(board, row, col, num)) {
+              board[row][col] = num;
+              solve();
+              if (solutions.length >= limit) return;
+              board[row][col] = 0;
+            }
+          }
+          return;
+        }
+      }
+    }
+    solutions.push(deepCopy(board));
+  }
+  solve();
+}
+
+function formatGrid(grid) {
+  return grid.map((row, r) =>
+    row.map(n => n || ".").join(" ") +
+    (r === 2 || r === 5 ? "\n---------------------" : "")
+  ).join("\n");
+}
+
+async function runPuzzle(name, raw, maxSolutions = 3) {
+  print(`Solving ${name}...`);
+  const board = raw.map(row => row.map(n => n === "." ? 0 : +n));
+  print(`Initial Puzzle: (${name})`);
+  print(formatGrid(board));
+  print("");
+
+  const solutions = [];
+  const attempts = { count: 0 };
+  const start = performance.now();
+  solveSudoku(board, solutions, maxSolutions, attempts);
+  const time = ((performance.now() - start) / 1000).toFixed(2);
+
+  print(`Found ${solutions.length} solution(s) in ${time} seconds`);
+  for (let i = 0; i < solutions.length; i++) {
+    print(`\nSolution #${i + 1}:`);
+    print(formatGrid(solutions[i]));
+  }
+  print("\n" + "-".repeat(50) + "\n");
+  await sleep(200); // just a short pause between puzzles
+}
+
+// Puzzle data
+const puzzles = [
+  {
+    name: "Arto Inkala Puzzle",
+    grid: [
+      ["1",".",".",".",".","7",".","9","."],
+      [".","3",".",".","2",".",".",".","8"],
+      [".",".","9","6",".",".","5",".","."],
+      [".",".","5","3",".",".","9",".","."],
+      [".","1",".",".","8",".",".",".","2"],
+      ["6",".",".",".",".","4",".",".","."],
+      ["3",".",".",".",".",".",".","1","."],
+      [".","4","1",".",".",".",".",".","7"],
+      [".",".","7",".",".",".","3",".","."]
+    ],
+    max: 1
+  },
+  {
+    name: "Platinum Blonde Puzzle",
+    grid: [
+      [".",".",".",".",".",".",".","1","."],
+      ["4",".",".",".",".",".",".",".","."],
+      [".","2",".",".",".",".",".",".","5"],
+      [".",".",".",".","3",".",".",".","."],
+      [".",".","1",".",".",".","2",".","."],
+      [".",".",".","9",".",".",".",".","."],
+      ["5",".",".",".",".",".",".","7","."],
+      [".",".",".",".",".",".",".",".","9"],
+      [".","4",".",".",".",".",".",".","."]
+    ],
+    max: 3
+  },
+  {
+    name: "Easter Monster Puzzle",
+    grid: [
+      [".",".",".",".",".",".",".","1","2"],
+      [".",".",".",".",".","7",".",".","."],
+      [".",".",".","9",".",".",".",".","."],
+      [".",".",".","5","3",".",".",".","."],
+      ["8",".",".",".",".",".",".","2","."],
+      [".",".","2",".",".",".",".",".","5"],
+      [".",".",".",".",".","4",".",".","."],
+      [".",".","5",".",".",".",".",".","."],
+      ["1","4",".",".",".",".",".",".","."]
+    ],
+    max: 3
+  }
+];
+
+// Run all
+(async () => {
+  for (const p of puzzles) {
+    await runPuzzle(p.name, p.grid, p.max);
+  }
+})();
+</script>
+</body>
+</html>
