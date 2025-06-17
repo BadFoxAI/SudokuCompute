@@ -16,7 +16,7 @@ A high-performance Sudoku batch solver with async solving, multiple solution det
 
 ## Features
 
-- Solves a set of challenging benchmark puzzles asynchronously  
+- Solves a set of challenging benchmark puzzles 
 - Finds multiple solutions (up to 2 by default)  
 - Measures and displays time taken to solve each puzzle  
 - Verifies correctness of each solution (rows, columns, and 3x3 boxes)  
