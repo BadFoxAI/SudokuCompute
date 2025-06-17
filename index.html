@@ -3,7 +3,7 @@
 <html lang="en">
 <head>
 <meta charset="UTF-8" />
-<title>Sudoku Batch Solver (with timing & verification)</title>
+<title>Sudoku Batch Solver (safe mode)</title>
 <style>
   body {
     background-color: black;
@@ -12,17 +12,41 @@
     white-space: pre-wrap;
     padding: 1rem;
   }
+  #header {
+    font-size: 2rem;
+    font-weight: bold;
+    margin-bottom: 0.5rem;
+  }
+  #description {
+    font-size: 0.9rem;
+    margin-bottom: 1rem;
+  }
+  a {
+    color: #00FF00;
+    text-decoration: underline;
+  }
   #terminal {
     white-space: pre-wrap;
     font-size: 14px;
     line-height: 1.3;
-    max-height: 90vh;
-    overflow-y: auto;
+    margin-bottom: 1rem;
+  }
+  #spinner {
+    font-size: 1.2rem;
+    height: 1.2rem;
   }
 </style>
 </head>
 <body>
+
+<div id="header">Sudoku Compute</div>
+<div id="description">
+  A high-performance Sudoku batch solver based on <a href="https://zenodo.org/records/15543486" target="_blank" rel="noopener noreferrer">this original paper</a>.<br />
+  Source code and updates on <a href="https://github.com/BadFoxAI/SudukoCompute" target="_blank" rel="noopener noreferrer">GitHub</a>.
+</div>
+
 <div id="terminal"></div>
+<div id="spinner"></div>
 
 <script>
 const puzzles = [
@@ -145,37 +169,7 @@ function cloneGrid(grid) {
   return grid.map(row => row.slice());
 }
 
-function verifySolution(board) {
-  // Checks rows, cols, boxes contain numbers 1-9 exactly once
-  function checkArray(arr) {
-    const s = new Set(arr);
-    return s.size === 9 && !s.has(0);
-  }
-  
-  for (let i = 0; i < 9; i++) {
-    // check row
-    if (!checkArray(board[i])) return false;
-    // check col
-    const col = [];
-    for (let j = 0; j < 9; j++) col.push(board[j][i]);
-    if (!checkArray(col)) return false;
-  }
-  // check 3x3 boxes
-  for (let br = 0; br < 3; br++) {
-    for (let bc = 0; bc < 3; bc++) {
-      const box = [];
-      for (let r = br * 3; r < br * 3 + 3; r++) {
-        for (let c = bc * 3; c < bc * 3 + 3; c++) {
-          box.push(board[r][c]);
-        }
-      }
-      if (!checkArray(box)) return false;
-    }
-  }
-  return true;
-}
-
-// Async solver with solution limit and yielding for UI
+// The solver function (unchanged from your working version)
 async function solveSudokuAsync(grid, maxSolutions = 2) {
   const solutions = [];
   const EMPTY = 0;
@@ -223,7 +217,7 @@ async function solveSudokuAsync(grid, maxSolutions = 2) {
 
     steps++;
     if (steps % 1000 === 0) {
-      // Yield control to UI every 1000 steps
+      // Yield to UI every 1000 steps
       await new Promise(resolve => setTimeout(resolve, 0));
     }
   }
@@ -243,41 +237,95 @@ function print(text = "") {
   terminal.scrollTop = terminal.scrollHeight;
 }
 
+// Verify solution correctness (basic Sudoku validity)
+function verifySolution(grid) {
+  for (let r = 0; r < 9; r++) {
+    const seenRow = new Set();
+    for (let c = 0; c < 9; c++) {
+      const val = grid[r][c];
+      if (val < 1 || val > 9 || seenRow.has(val)) return false;
+      seenRow.add(val);
+    }
+  }
+  for (let c = 0; c < 9; c++) {
+    const seenCol = new Set();
+    for (let r = 0; r < 9; r++) {
+      const val = grid[r][c];
+      if (val < 1 || val > 9 || seenCol.has(val)) return false;
+      seenCol.add(val);
+    }
+  }
+  for (let boxRow = 0; boxRow < 3; boxRow++) {
+    for (let boxCol = 0; boxCol < 3; boxCol++) {
+      const seenBox = new Set();
+      for (let r = boxRow * 3; r < boxRow * 3 + 3; r++) {
+        for (let c = boxCol * 3; c < boxCol * 3 + 3; c++) {
+          const val = grid[r][c];
+          if (val < 1 || val > 9 || seenBox.has(val)) return false;
+          seenBox.add(val);
+        }
+      }
+    }
+  }
+  return true;
+}
+
+function startSpinner() {
+  const spinnerEl = document.getElementById('spinner');
+  const spinnerFrames = ['|', '/', '-', '\\'];
+  let i = 0;
+  return setInterval(() => {
+    spinnerEl.textContent = spinnerFrames[i % spinnerFrames.length] + " Solving...";
+    i++;
+  }, 150);
+}
+
+function stopSpinner(spinnerId) {
+  clearInterval(spinnerId);
+  document.getElementById('spinner').textContent = '';
+}
+
 async function runBatchSolver() {
   print('--- Running benchmark puzzles ---');
+
+  const spinnerId = startSpinner();
+
   for (const puzzle of puzzles) {
     print(`\n=== ${puzzle.name} ===\n`);
     print("Original Puzzle:");
     puzzle.grid.forEach(row => print(row));
     print("");
 
-    const start = performance.now();
+    const startTime = performance.now();
+    // Let’s keep maxSolutions = 2 like your original for fast solves, change if needed
     const solutions = await solveSudokuAsync(puzzle.grid, 2);
-    const end = performance.now();
-    const duration = ((end - start) / 1000).toFixed(3);
+    const endTime = performance.now();
+    const elapsed = (endTime - startTime).toFixed(2);
 
     if (solutions.length === 0) {
       print("No solutions found.\n");
     } else if (solutions.length === 1) {
-      print(`Single solution found in ${duration}s:\n`);
+      print(`Single solution found in ${elapsed} ms:\n`);
       print(formatGrid(solutions[0]) + "\n");
-      print(`Verification: ${verifySolution(solutions[0]) ? "✅ Valid solution" : "❌ Invalid solution"}`);
+      print("Verification: " + (verifySolution(solutions[0]) ? "VALID" : "INVALID") + "\n");
     } else {
-      print(`Multiple (${solutions.length}) solutions found in ${duration}s. Showing first two:\n`);
+      print(`${solutions.length} solutions found in ${elapsed} ms. Showing first two:\n`);
       for (let i = 0; i < solutions.length; i++) {
         print(`Solution #${i + 1}:`);
         print(formatGrid(solutions[i]) + "\n");
-        print(`Verification: ${verifySolution(solutions[i]) ? "✅ Valid solution" : "❌ Invalid solution"}\n`);
+        print("Verification: " + (verifySolution(solutions[i]) ? "VALID" : "INVALID") + "\n");
       }
     }
   }
+
+  stopSpinner(spinnerId);
   print("--- All benchmark puzzles solved ---");
 }
 
 window.onload = () => {
-  print('');
   runBatchSolver();
 };
 </script>
+
 </body>
 </html>
