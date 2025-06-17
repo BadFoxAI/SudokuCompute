@@ -1,158 +1,283 @@
+
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <title>Sudoku Solver Terminal</title>
-  <style>
-    body {
-      background-color: #111;
-      color: #0f0;
-      font-family: monospace;
-      padding: 20px;
-    }
-    pre {
-      white-space: pre-wrap;
-    }
-  </style>
+<meta charset="UTF-8" />
+<title>Sudoku Batch Solver (with timing & verification)</title>
+<style>
+  body {
+    background-color: black;
+    color: #00FF00;
+    font-family: monospace;
+    white-space: pre-wrap;
+    padding: 1rem;
+  }
+  #terminal {
+    white-space: pre-wrap;
+    font-size: 14px;
+    line-height: 1.3;
+    max-height: 90vh;
+    overflow-y: auto;
+  }
+</style>
 </head>
 <body>
-<pre id="terminal"></pre>
+<div id="terminal"></div>
 
 <script>
-const terminal = document.getElementById("terminal");
+const puzzles = [
+  {
+    "name": "Arto Inkala Puzzle (AI Escargot)",
+    "grid": [
+      "100007090",
+      "003000000",
+      "000503200",
+      "000000000",
+      "000000070",
+      "000008000",
+      "000000000",
+      "000000000",
+      "000000000"
+    ]
+  },
+  {
+    "name": "Easter Monster",
+    "grid": [
+      "005300000",
+      "800000020",
+      "070010500",
+      "400005300",
+      "010070006",
+      "003200080",
+      "060000400",
+      "000000017",
+      "000900000"
+    ]
+  },
+  {
+    "name": "The World’s Hardest Sudoku (by Finnish mathematician Arto Inkala)",
+    "grid": [
+      "800000000",
+      "003600000",
+      "070090200",
+      "050007000",
+      "000045700",
+      "000100030",
+      "001000068",
+      "008500010",
+      "090000400"
+    ]
+  },
+  {
+    "name": "Platinum Blonde",
+    "grid": [
+      "200080300",
+      "060070084",
+      "030500209",
+      "000105408",
+      "000000000",
+      "402706000",
+      "301007040",
+      "720040060",
+      "004010003"
+    ]
+  },
+  {
+    "name": "The Golden Nugget",
+    "grid": [
+      "000000907",
+      "000420180",
+      "000705026",
+      "100904000",
+      "050000040",
+      "000507009",
+      "920108000",
+      "034059000",
+      "507000000"
+    ]
+  },
+  {
+    "name": "AI Escargot Variant",
+    "grid": [
+      "030000000",
+      "000605000",
+      "000010000",
+      "000070050",
+      "600000003",
+      "080020000",
+      "000040000",
+      "000302000",
+      "000000070"
+    ]
+  },
+  {
+    "name": "The Shark Puzzle",
+    "grid": [
+      "000000000",
+      "010020300",
+      "005008000",
+      "000000060",
+      "040300070",
+      "060000000",
+      "000700800",
+      "009010040",
+      "000000000"
+    ]
+  },
+  {
+    "name": "Butterfly Sudoku",
+    "grid": [
+      "000000001",
+      "060050000",
+      "000004070",
+      "000006000",
+      "008000900",
+      "000002000",
+      "070300000",
+      "000010040",
+      "500000000"
+    ]
+  }
+];
 
-function print(line = "") {
-  terminal.textContent += line + "\n";
+// Deep clone 2D array
+function cloneGrid(grid) {
+  return grid.map(row => row.slice());
 }
 
-function sleep(ms) {
-  return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-// Sudoku solving logic
-function isValid(board, row, col, num) {
+function verifySolution(board) {
+  // Checks rows, cols, boxes contain numbers 1-9 exactly once
+  function checkArray(arr) {
+    const s = new Set(arr);
+    return s.size === 9 && !s.has(0);
+  }
+  
   for (let i = 0; i < 9; i++) {
-    if (board[row][i] === num || board[i][col] === num)
-      return false;
-    const boxRow = 3 * Math.floor(row / 3) + Math.floor(i / 3);
-    const boxCol = 3 * Math.floor(col / 3) + i % 3;
-    if (board[boxRow][boxCol] === num)
-      return false;
+    // check row
+    if (!checkArray(board[i])) return false;
+    // check col
+    const col = [];
+    for (let j = 0; j < 9; j++) col.push(board[j][i]);
+    if (!checkArray(col)) return false;
+  }
+  // check 3x3 boxes
+  for (let br = 0; br < 3; br++) {
+    for (let bc = 0; bc < 3; bc++) {
+      const box = [];
+      for (let r = br * 3; r < br * 3 + 3; r++) {
+        for (let c = bc * 3; c < bc * 3 + 3; c++) {
+          box.push(board[r][c]);
+        }
+      }
+      if (!checkArray(box)) return false;
+    }
   }
   return true;
 }
 
-function deepCopy(grid) {
-  return grid.map(row => row.slice());
-}
+// Async solver with solution limit and yielding for UI
+async function solveSudokuAsync(grid, maxSolutions = 2) {
+  const solutions = [];
+  const EMPTY = 0;
+  const board = grid.map(row => row.split('').map(c => parseInt(c, 10)));
 
-function solveSudoku(board, solutions, limit, attempts) {
-  function solve() {
-    for (let row = 0; row < 9; row++) {
-      for (let col = 0; col < 9; col++) {
-        if (board[row][col] === 0) {
-          for (let num = 1; num <= 9; num++) {
-            attempts.count++;
-            if (isValid(board, row, col, num)) {
-              board[row][col] = num;
-              solve();
-              if (solutions.length >= limit) return;
-              board[row][col] = 0;
-            }
-          }
-          return;
+  function isValid(r, c, num) {
+    for (let i = 0; i < 9; i++) {
+      if (board[r][i] === num) return false;
+      if (board[i][c] === num) return false;
+    }
+    const boxRow = Math.floor(r / 3) * 3;
+    const boxCol = Math.floor(c / 3) * 3;
+    for (let i = boxRow; i < boxRow + 3; i++) {
+      for (let j = boxCol; j < boxCol + 3; j++) {
+        if (board[i][j] === num) return false;
+      }
+    }
+    return true;
+  }
+
+  let steps = 0;
+
+  async function backtrack(pos = 0) {
+    if (solutions.length >= maxSolutions) return;
+
+    if (pos === 81) {
+      solutions.push(cloneGrid(board));
+      return;
+    }
+
+    const r = Math.floor(pos / 9);
+    const c = pos % 9;
+    if (board[r][c] !== EMPTY) {
+      await backtrack(pos + 1);
+    } else {
+      for (let num = 1; num <= 9; num++) {
+        if (solutions.length >= maxSolutions) return;
+        if (isValid(r, c, num)) {
+          board[r][c] = num;
+          await backtrack(pos + 1);
+          board[r][c] = EMPTY;
         }
       }
     }
-    solutions.push(deepCopy(board));
+
+    steps++;
+    if (steps % 1000 === 0) {
+      // Yield control to UI every 1000 steps
+      await new Promise(resolve => setTimeout(resolve, 0));
+    }
   }
-  solve();
+
+  await backtrack();
+
+  return solutions;
 }
 
 function formatGrid(grid) {
-  return grid.map((row, r) =>
-    row.map(n => n || ".").join(" ") +
-    (r === 2 || r === 5 ? "\n---------------------" : "")
-  ).join("\n");
+  return grid.map(row => row.join('')).join('\n');
 }
 
-async function runPuzzle(name, raw, maxSolutions = 3) {
-  print(`Solving ${name}...`);
-  const board = raw.map(row => row.map(n => n === "." ? 0 : +n));
-  print(`Initial Puzzle: (${name})`);
-  print(formatGrid(board));
-  print("");
-
-  const solutions = [];
-  const attempts = { count: 0 };
-  const start = performance.now();
-  solveSudoku(board, solutions, maxSolutions, attempts);
-  const time = ((performance.now() - start) / 1000).toFixed(2);
-
-  print(`Found ${solutions.length} solution(s) in ${time} seconds`);
-  for (let i = 0; i < solutions.length; i++) {
-    print(`\nSolution #${i + 1}:`);
-    print(formatGrid(solutions[i]));
-  }
-  print("\n" + "-".repeat(50) + "\n");
-  await sleep(200); // just a short pause between puzzles
+function print(text = "") {
+  const terminal = document.getElementById("terminal");
+  terminal.textContent += text + "\n";
+  terminal.scrollTop = terminal.scrollHeight;
 }
 
-// Puzzle data
-const puzzles = [
-  {
-    name: "Arto Inkala Puzzle",
-    grid: [
-      ["1",".",".",".",".","7",".","9","."],
-      [".","3",".",".","2",".",".",".","8"],
-      [".",".","9","6",".",".","5",".","."],
-      [".",".","5","3",".",".","9",".","."],
-      [".","1",".",".","8",".",".",".","2"],
-      ["6",".",".",".",".","4",".",".","."],
-      ["3",".",".",".",".",".",".","1","."],
-      [".","4","1",".",".",".",".",".","7"],
-      [".",".","7",".",".",".","3",".","."]
-    ],
-    max: 1
-  },
-  {
-    name: "Platinum Blonde Puzzle",
-    grid: [
-      [".",".",".",".",".",".",".","1","."],
-      ["4",".",".",".",".",".",".",".","."],
-      [".","2",".",".",".",".",".",".","5"],
-      [".",".",".",".","3",".",".",".","."],
-      [".",".","1",".",".",".","2",".","."],
-      [".",".",".","9",".",".",".",".","."],
-      ["5",".",".",".",".",".",".","7","."],
-      [".",".",".",".",".",".",".",".","9"],
-      [".","4",".",".",".",".",".",".","."]
-    ],
-    max: 3
-  },
-  {
-    name: "Easter Monster Puzzle",
-    grid: [
-      [".",".",".",".",".",".",".","1","2"],
-      [".",".",".",".",".","7",".",".","."],
-      [".",".",".","9",".",".",".",".","."],
-      [".",".",".","5","3",".",".",".","."],
-      ["8",".",".",".",".",".",".","2","."],
-      [".",".","2",".",".",".",".",".","5"],
-      [".",".",".",".",".","4",".",".","."],
-      [".",".","5",".",".",".",".",".","."],
-      ["1","4",".",".",".",".",".",".","."]
-    ],
-    max: 3
-  }
-];
+async function runBatchSolver() {
+  print('--- Running benchmark puzzles ---');
+  for (const puzzle of puzzles) {
+    print(`\n=== ${puzzle.name} ===\n`);
+    print("Original Puzzle:");
+    puzzle.grid.forEach(row => print(row));
+    print("");
 
-// Run all
-(async () => {
-  for (const p of puzzles) {
-    await runPuzzle(p.name, p.grid, p.max);
+    const start = performance.now();
+    const solutions = await solveSudokuAsync(puzzle.grid, 2);
+    const end = performance.now();
+    const duration = ((end - start) / 1000).toFixed(3);
+
+    if (solutions.length === 0) {
+      print("No solutions found.\n");
+    } else if (solutions.length === 1) {
+      print(`Single solution found in ${duration}s:\n`);
+      print(formatGrid(solutions[0]) + "\n");
+      print(`Verification: ${verifySolution(solutions[0]) ? "✅ Valid solution" : "❌ Invalid solution"}`);
+    } else {
+      print(`Multiple (${solutions.length}) solutions found in ${duration}s. Showing first two:\n`);
+      for (let i = 0; i < solutions.length; i++) {
+        print(`Solution #${i + 1}:`);
+        print(formatGrid(solutions[i]) + "\n");
+        print(`Verification: ${verifySolution(solutions[i]) ? "✅ Valid solution" : "❌ Invalid solution"}\n`);
+      }
+    }
   }
-})();
+  print("--- All benchmark puzzles solved ---");
+}
+
+window.onload = () => {
+  print('');
+  runBatchSolver();
+};
 </script>
 </body>
 </html>
